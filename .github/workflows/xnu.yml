@@ -16,7 +16,7 @@ on:
         description: make -k (collect all compile errors in one run)
         default: "true"
   push:
-    branches: [main]
+    branches: [main, topaz]
     paths:
       - "xnu/patches/**"
       - ".github/workflows/xnu.yml"
