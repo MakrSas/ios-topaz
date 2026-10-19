@@ -165,6 +165,35 @@ Not in git: partition backups, live device trees, Apple firmware and root images
 | 0081 | ARMv8.0: `-mcpu=cortex-a53`, no PAN, PFZ without CASA, userland LSE/LDAPR emulation |
 | 0082 | Boot CPU is Gold MPIDR `0x100` |
 | 0083 | Touch: FocalTech FT5452 on QUP0 SE2 (values from [topaz-woa](https://github.com/MakrSas/topaz-woa) TopazTouch) |
+| 0084 | Touch diagnostics: `sweettouchdiag=1` panics with the touch probe values on failure |
+| 0085 | `sweetfb_stayon=1` ignores display-off requests |
+| 0086 | Touch parser as in TopazTouch (event 3 = empty slot); `sweettouchdiag=2` statistics |
+| 0087 | Touch RCG offset fix (0x1f3a8), 400 kHz, IRQ-gated polling; topaz keys |
+| 0088 | LUN0 GPT watchdog and write fence (see RECOVERY.md) |
+| 0089 | Touch: FT5452 firmware/mode at probe, raw bytes of rejected frames |
+| 0090 | Touch: a TD_STATUS 0xff frame (no-touch) releases all contacts |
+| 0091 | Battery: SM5602 gauge + charger status over QUP0 SE1 (read-only) |
+| 0092 | Direct MDP scanout of full-screen surfaces (no CPU frame copy) |
+| 0093 | Scanout from contiguous RAM; `mkadt.py --native` canvas |
+| 0094 | Gold cluster at max cpufreq |
+| 0095 | Write-combined console framebuffer |
+| 0096 | Smooth display-off fade (cached buffer, whole-frame flips) |
+| 0097 | Unified console scanout (cached shadow + MDP); panics use the same path |
+| 0098 | INTF1 refresh-rate diagnostics (read-only) |
+| 0099 | On-screen IOSurfaces held in use; console cache flush batched per vsync |
+| 0100 | Double-buffered kernel frames: flip at vsync, never draw into the scanned buffer |
+| 0101 | Real `flush_dcache`/`clean_dcache` (they were coherent-IO no-ops) |
+| 0102 | Tear-free frames: console copy under the putc lock, iOS surfaces copied to the back buffer then flipped |
+| 0103 | Multi-layer frames (dims, apps) composed in the back buffer and flipped |
+| 0104 | Panel brightness via DSI DCS 0x51 from `IOMFBBrightnessLevel` |
+| 0105 | AppleARMBacklight service so CoreBrightness drives the panel |
+| 0106 | DCS 0x28/0x29 display off/on with RequestPowerChange |
+| 0107 | Display-only real dcache clean; asynchronous panel brightness (backboardd no longer stalls on DSI waits) |
+| 0110 | AppleARMBacklight only with `sweetbl=1` (CoreBrightness digital dimming killed CPU rendering) |
+| 0111 | Real cache maintenance (`dc cvac`/`dc civac`) for display buffers (this kernel config makes `clean_dcache` a no-op) |
+| 0112 | Console log filter: boot-arg `sweetlog=WORD,WORD` draws only matching lines |
+
+Patch numbers 0108 and 0109 were never used.
 
 ## Key hardware facts (topaz)
 
