@@ -1,0 +1,50 @@
+From 90ae9165e5a2cc36d3471e5bc18c7e3c5897dbcf Mon Sep 17 00:00:00 2001
+From: Taurind14 <huqsakamara@gmail.com>
+Date: Mon, 19 Oct 2026 21:40:32 +0700
+Subject: [PATCH] topaz-0116: touch: release all contacts on TD_STATUS 0 frames
+
+touch_focaltech() only treated the FT5452's 0xff idle frame as
+'release all' (0090). A frame with TD_STATUS 0 fell through to the
+slot parser: TopazTouch v0.13 documents that such a frame can still
+carry a stale contact slot, which kept a lifted finger down on
+Windows until count 0 was treated as release-all (as Linux focaltech
+does); an all-zero frame would even parse as finger 0 down at (0,0).
+Treat n == 0 the same as the 0xff idle frame.
+
+Renumbered 0114 -> 0116: upstream landed its own 0114 while this
+was in review (PR #3).
+
+Verified: bsd/dev/sweet_touch.c reconstructed from patches
+0001-0114 is byte-identical to the series' own resulting blob
+(ff9d858) and the patch applies cleanly on top of it.
+---
+ bsd/dev/sweet_touch.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/bsd/dev/sweet_touch.c b/bsd/dev/sweet_touch.c
+index ff9d858..370d18b 100644
+--- a/bsd/dev/sweet_touch.c
++++ b/bsd/dev/sweet_touch.c
+@@ -490,11 +490,15 @@ touch_focaltech(void)
+ 	if (n > st.s_maxn) {
+ 		st.s_maxn = n;
+ 	}
+-	if (n > TOUCH_MAX && buf[3] == 0xffu) {
++	if (n == 0 || (n > TOUCH_MAX && buf[3] == 0xffu)) {
+ 		/*
+-		 * topaz: with no contact the FT5452 (firmware as updated by HyperOS
+-		 * 2.0.208) reports TD_STATUS 0xff and 0xff records. TopazTouch: a count
+-		 * of 0 or > 10 means "release all", not an error.
++		 * topaz: an empty report releases every contact, like Linux
++		 * focaltech and TopazTouch. With no contact the FT5452 (firmware
++		 * as updated by HyperOS 2.0.208) reports TD_STATUS 0xff and 0xff
++		 * records; TD_STATUS 0 must not be parsed as slots either: its
++		 * records can carry a stale contact slot that resurrects a lifted
++		 * finger (TopazTouch v0.13 fixed exactly that stuck-finger case),
++		 * and an all-zero frame would become a phantom finger 0 at (0,0).
+ 		 */
+ 		touch_report(0, x, y);
+ 		return 0;
+-- 
+2.43.0
+
