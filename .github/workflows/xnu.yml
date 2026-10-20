@@ -15,6 +15,9 @@ on:
       keep_going:
         description: make -k (collect all compile errors in one run)
         default: "true"
+      reeder:
+        description: "true = 4K pages for the reeder (MediaTek MT6757, 8x Cortex-A53, patch 0200)"
+        default: "false"
   push:
     branches: [main]
     paths:
@@ -32,6 +35,8 @@ env:
   MACOS_VERSION: ${{ inputs.macos_version || '13.5' }}
   KERNEL_CONFIG: ${{ inputs.kernel_config || 'DEVELOPMENT' }}
   MACHINE_CONFIG: ${{ inputs.machine_config || 'SWEET' }}
+  # read by makedefs/MakeInc.def (patch 0200): non-empty adds -DREEDER
+  SWEET_REEDER: ${{ inputs.reeder == 'true' && '1' || '' }}
   # ccache: xnu is ~2000 compiles; a patch usually changes a few of them
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_BASEDIR: ${{ github.workspace }}
@@ -91,9 +96,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ env.MACHINE_CONFIG }}-${{ env.KERNEL_CONFIG }}-${{ hashFiles('xnu/patches/**', '.github/workflows/xnu.yml') }}
+          key: ccache-${{ env.MACHINE_CONFIG }}${{ env.SWEET_REEDER && '-4k' || '' }}-${{ env.KERNEL_CONFIG }}-${{ hashFiles('xnu/patches/**', '.github/workflows/xnu.yml') }}
           restore-keys: |
-            ccache-${{ env.MACHINE_CONFIG }}-${{ env.KERNEL_CONFIG }}-
+            ccache-${{ env.MACHINE_CONFIG }}${{ env.SWEET_REEDER && '-4k' || '' }}-${{ env.KERNEL_CONFIG }}-
 
       - name: Build
         working-directory: dxb

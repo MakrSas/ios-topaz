@@ -1,0 +1,51 @@
+diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
+--- a/makedefs/MakeInc.def
++++ b/makedefs/MakeInc.def
+@@ -64,6 +64,9 @@
+ # topaz: Cortex-A53/A73 are ARMv8.0 (no LSE atomics, RCpc, PAN or FP16). An explicit
+ # -mcpu: -arch arm64 otherwise keeps clang's apple-m1 default and its LSE/RCpc features
+ MACHINE_FLAGS_ARM64_SWEET = -DARM64_BOARD_CONFIG_SWEET                -mcpu=cortex-a53
++# reeder (MediaTek MT6757, 8x Cortex-A53, no 16K granule): SWEET_REEDER=1 in the
++# environment builds the same kernel on 4K pages (see pexpert/arm64/SWEET.h)
++MACHINE_FLAGS_ARM64_SWEET += $(if $(SWEET_REEDER),-DREEDER)
+ 
+ 
+ #
+diff --git a/pexpert/pexpert/arm64/SWEET.h b/pexpert/pexpert/arm64/SWEET.h
+index 424e1c0..7b3fb17 100644
+--- a/pexpert/pexpert/arm64/SWEET.h
++++ b/pexpert/pexpert/arm64/SWEET.h
+@@ -35,7 +35,15 @@
+ #define __ARM_ENABLE_SWAP__       1
+ #define __ARM_V8_CRYPTO_EXTENSIONS__ 1
+ /* topaz: Cortex-A53/A73 have no PAN (ARMv8.1); MSR PAN is undefined there */
++/*
++ * reeder (MediaTek MT6757, 8x Cortex-A53): no core has the 16K translation
++ * granule (ID_AA64MMFR0.TGran16 = 0), so the kernel runs on 4K pages like
++ * XNU's own BCM2837 (Raspberry Pi 3, Cortex-A53) config. Opt-in: build with
++ * SWEET_REEDER=1 (makedefs/MakeInc.def adds -DREEDER).
++ */
++#if !defined(REEDER)
+ #define __ARM_16K_PG__            1
++#endif
+ 
+ #define HAS_GIC_V3                1
+ 
+diff --git a/osfmk/mach/arm/vm_param.h b/osfmk/mach/arm/vm_param.h
+index c013288..111902d 100644
+--- a/osfmk/mach/arm/vm_param.h
++++ b/osfmk/mach/arm/vm_param.h
+@@ -133,7 +133,12 @@ extern int PAGE_SHIFT_CONST;
+ 
+ /* system-wide values */
+ #define MACH_VM_MIN_ADDRESS_RAW 0x0ULL
+-#if defined(XNU_PLATFORM_MacOSX) || defined(XNU_PLATFORM_DriverKit)
++/*
++ * reeder (4K pages, see pexpert/arm64/SWEET.h): the kernel is built for the
++ * macOS platform, but a 4K-page arm64 pmap nests the commpage in its own L1
++ * (1 GiB) region above the user VA range, so use the iOS layout (A7/A8 era).
++ */
++#if (defined(XNU_PLATFORM_MacOSX) || defined(XNU_PLATFORM_DriverKit)) && !defined(REEDER)
+ #define MACH_VM_MAX_ADDRESS_RAW 0x00007FFFFE000000ULL
+ #else
+ #define MACH_VM_MAX_ADDRESS_RAW 0x0000000FC0000000ULL
