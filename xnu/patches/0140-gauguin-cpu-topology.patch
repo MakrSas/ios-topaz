@@ -1,7 +1,7 @@
 diff --git a/iokit/Kernel/arm/SweetCPU.cpp b/iokit/Kernel/arm/SweetCPU.cpp
 --- a/iokit/Kernel/arm/SweetCPU.cpp
 +++ b/iokit/Kernel/arm/SweetCPU.cpp
-@@ -73,9 +73,9 @@
+@@ -73,8 +73,8 @@
  	if (*(const uint32_t *)reg->getBytesNoCopy() != cpu->phys_id) {
  		return false;
  	}
@@ -12,8 +12,7 @@ diff --git a/iokit/Kernel/arm/SweetCPU.cpp b/iokit/Kernel/arm/SweetCPU.cpp
  	    topology->num_cpus > SWEET_SMP_MAX_CPUS) {
  		panic("SWEET CPU: invalid topology cpu=%u mpidr=0x%x count=%u",
  		    cpu->cpu_id, cpu->phys_id, topology->num_cpus);
- 	}
-@@ -85,7 +85,7 @@
+@@ -82,7 +82,7 @@
  	if (!IOCPU::start(provider)) {
  		return false;
  	}
@@ -22,8 +21,9 @@ diff --git a/iokit/Kernel/arm/SweetCPU.cpp b/iokit/Kernel/arm/SweetCPU.cpp
  	if (cpuName == NULL) {
  		return false;
  	}
-@@ -144,10 +144,7 @@
- 	IOSleep(1);
+@@ -144,12 +144,9 @@
+ 		}
+ 		IOSleep(1);
  	}
 -	/*
 -	 * topaz: the ADT lists only the A73 (gold) cores and the shim boots xnu
@@ -31,19 +31,28 @@ diff --git a/iokit/Kernel/arm/SweetCPU.cpp b/iokit/Kernel/arm/SweetCPU.cpp
 -	 */
 -	if (topology->boot_cpu->cpu_id != 0 || topology->boot_cpu->phys_id != 0x100) {
 -		panic("SWEET CPU: expected boot MPIDR 0x100 and logical CPU 0, got 0x%x/%u",
--		    topology->boot_cpu->phys_id, topology->boot_cpu->cpu_id);
 +	/* Gauguin shim boots on MPIDR 0; this core reports TGran16 support. */
 +	if (topology->boot_cpu->cpu_id != 0 || topology->boot_cpu->phys_id != 0) {
 +		panic("SWEET CPU: expected boot MPIDR 0 and logical CPU 0, got 0x%x/%u",
-+		    topology->boot_cpu->phys_id, topology->boot_cpu->cpu_id);
+ 		    topology->boot_cpu->phys_id, topology->boot_cpu->cpu_id);
  	}
+ 	for (unsigned int i = 0; i < topology->num_cpus; i++) {
 diff --git a/pexpert/pexpert/arm64/SWEET.h b/pexpert/pexpert/arm64/SWEET.h
 --- a/pexpert/pexpert/arm64/SWEET.h
 +++ b/pexpert/pexpert/arm64/SWEET.h
-@@ -20,5 +20,5 @@
-  * All eight cores as one homogeneous SMP cluster (topaz: four A53 at
+@@ -18,11 +18,10 @@
+ #define SWEET                     1
+ 
+ /*
+- * All eight cores as one homogeneous SMP cluster (topaz: four A53 at
 - * MPIDR 0x0-0x3 + four A73 at 0x100-0x103; sweet: six A55 + two A76):
-+ * MPIDR 0x0-0x3 + four A73 at 0x100-0x103; Gauguin: MPIDR 0x000-0x700):
-  * cpus=N is clamped here. Same ISA level (ARMv8.2), 64-byte lines, PSCI
-  * CPU_ON; the scheduler does not know the A76s are faster (no AMP/P-E
-  * clusters yet).
+- * cpus=N is clamped here. Same ISA level (ARMv8.2), 64-byte lines, PSCI
+- * CPU_ON; the scheduler does not know the A76s are faster (no AMP/P-E
+- * clusters yet).
++ * Gauguin (SM7225): six efficiency cores and two performance cores; MPIDR
++ * values are expected in the 0x000-0x500 and 0x600-0x700 ranges.
++ * cpus=N is clamped here. ARMv8.2 baseline, 64-byte lines, and PSCI CPU_ON;
++ * heterogeneous core scheduling is not modeled yet.
+  */
+ #define SWEET_SMP_MAX_CPUS         8
+ 
