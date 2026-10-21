@@ -1,0 +1,49 @@
+diff --git a/iokit/Kernel/arm/SweetCPU.cpp b/iokit/Kernel/arm/SweetCPU.cpp
+--- a/iokit/Kernel/arm/SweetCPU.cpp
++++ b/iokit/Kernel/arm/SweetCPU.cpp
+@@ -73,9 +73,9 @@
+ 	if (*(const uint32_t *)reg->getBytesNoCopy() != cpu->phys_id) {
+ 		return false;
+ 	}
+-	/* topaz (SM6225): MPIDR Aff1 = cluster, Aff0 = core: 0x0-0x3 A53, 0x100-0x103 A73 */
+-	if ((cpu->phys_id >> 8) > 1 || (cpu->phys_id & 0xff) > 3 ||
++	/* Gauguin (SM7225): MPIDR Aff1 indexes core; 0x000-0x500 efficiency, 0x600/0x700 performance. */
++	if (cpu->phys_id > 0x700 || (cpu->phys_id & 0xff) != 0 ||
+ 	    topology->num_cpus > SWEET_SMP_MAX_CPUS) {
+ 		panic("SWEET CPU: invalid topology cpu=%u mpidr=0x%x count=%u",
+ 		    cpu->cpu_id, cpu->phys_id, topology->num_cpus);
+ 	}
+@@ -85,7 +85,7 @@
+ 	if (!IOCPU::start(provider)) {
+ 		return false;
+ 	}
+-	cpuName = OSSymbol::withCStringNoCopy("Kryo 260");
++	cpuName = OSSymbol::withCStringNoCopy("Kryo 570");
+ 	if (cpuName == NULL) {
+ 		return false;
+ 	}
+@@ -144,10 +144,7 @@
+ 	IOSleep(1);
+ 	}
+-	/*
+-	 * topaz: the ADT lists only the A73 (gold) cores and the shim boots xnu
+-	 * on gold CPU 0x100 (the silver cluster has no 16K granule).
+-	 */
+-	if (topology->boot_cpu->cpu_id != 0 || topology->boot_cpu->phys_id != 0x100) {
+-		panic("SWEET CPU: expected boot MPIDR 0x100 and logical CPU 0, got 0x%x/%u",
+-		    topology->boot_cpu->phys_id, topology->boot_cpu->cpu_id);
++	/* Gauguin shim boots on MPIDR 0; this core reports TGran16 support. */
++	if (topology->boot_cpu->cpu_id != 0 || topology->boot_cpu->phys_id != 0) {
++		panic("SWEET CPU: expected boot MPIDR 0 and logical CPU 0, got 0x%x/%u",
++		    topology->boot_cpu->phys_id, topology->boot_cpu->cpu_id);
+ 	}
+diff --git a/pexpert/pexpert/arm64/SWEET.h b/pexpert/pexpert/arm64/SWEET.h
+--- a/pexpert/pexpert/arm64/SWEET.h
++++ b/pexpert/pexpert/arm64/SWEET.h
+@@ -20,5 +20,5 @@
+  * All eight cores as one homogeneous SMP cluster (topaz: four A53 at
+- * MPIDR 0x0-0x3 + four A73 at 0x100-0x103; sweet: six A55 + two A76):
++ * MPIDR 0x0-0x3 + four A73 at 0x100-0x103; Gauguin: MPIDR 0x000-0x700):
+  * cpus=N is clamped here. Same ISA level (ARMv8.2), 64-byte lines, PSCI
+  * CPU_ON; the scheduler does not know the A76s are faster (no AMP/P-E
+  * clusters yet).
