@@ -32,7 +32,7 @@ GICR, GICR_SIZE = 0x0f300000, 0x100000
 # cont_splash_region left lit by ABL
 FB, FB_SIZE = 0x5c000000, 0xf00000
 SWEET_ECID = 0x544f50415a000001  # 'TOPAZ' + 1, synthetic
-FB_W, FB_H, FB_STRIDE = 1080, 2400, 1080 * 4
+FB_W, FB_H, FB_STRIDE = 1200, 1920, 1200 * 4
 # Internal UFS host (ufshc@4804000 "ufs_mem"); QEMU virt has none
 UFS, UFS_SIZE = 0x04804000, 0x3000
 TIMEBASE = 19200000
@@ -195,8 +195,8 @@ def build(seed=None, qemu=False, highmem=False, native=False, midmem=False):
             # --native: present the real 1080x2400 panel (needed for direct MDP scanout,
             # which must match the canvas: sweetfb_native=1 with a 1125x2436 canvas makes
             # backboardd ask for a hardware scaler that does not exist)
-            ('canvas-width', u32(1080 if native else 1125)),
-            ('canvas-height', u32(2400 if native else 2436)),
+            ('canvas-width', u32(1200 if native else 1200)),
+            ('canvas-height', u32(1920 if native else 1920)),
         ])])
 
     fbcon = node('sweet-fbcon', [
