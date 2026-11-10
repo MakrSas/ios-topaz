@@ -30,7 +30,7 @@ diff --git a/bsd/dev/sweet_emmc.c b/bsd/dev/sweet_emmc.c
 new file mode 100644
 --- /dev/null
 +++ b/bsd/dev/sweet_emmc.c
-@@ -0,0 +1,737 @@
+@@ -0,0 +1,768 @@
 +/*
 + * SWEET internal eMMC root device (read-only) for the Redmi Pad SE (xun).
 + *
@@ -121,6 +121,31 @@ new file mode 100644
 +#define DMA_SIZE        (DMA_BOUNCE + BOUNCE_SIZE)
 +
 +#define MS_NS           (1000ull * 1000)
++
++/*
++ * Progress marks painted straight into the boot framebuffer the MDP scans out
++ * (0x5c000000, 1200 px wide, stride 4800), bottom row: the kernel console is not
++ * always visible on the Pad SE panel. One 80x40 block per step, 100 px apart:
++ * green = ok, red = failed. 0 init entered, 1 device-tree node, 2 host and card
++ * bring-up, 3 GPT partition found, 4 disk registered.
++ */
++static volatile uint32_t *e_fb;
++
++static void
++e_mark(unsigned step, bool ok)
++{
++	if (e_fb == NULL) {
++		e_fb = (volatile uint32_t *)ml_io_map(0x5c000000, 0xf00000);
++	}
++	if (e_fb == NULL) {
++		return;
++	}
++	for (uint32_t y = 1880; y < 1920; y++) {
++		for (uint32_t x = 100 * step; x < 100 * step + 80; x++) {
++			e_fb[y * 1200 + x] = ok ? 0xff00ff00 : 0xffff0000;
++		}
++	}
++}
 +
 +static struct {
 +	vm_offset_t regs;
@@ -699,12 +724,15 @@ new file mode 100644
 +	char want[64] = "userdata";
 +	int error;
 +
++	e_mark(0, true);
 +	if (SecureDTLookupEntry(NULL, "/sweet-emmc", &node) != kSuccess ||
 +	    SecureDTGetProperty(node, "reg", (void const **)&reg, &size) != kSuccess ||
 +	    size < 2 * sizeof(uintptr_t)) {
 +		printf("SWEET EMMC: no /sweet-emmc node in the device tree\n");
++		e_mark(1, false);
 +		return ENXIO;
 +	}
++	e_mark(1, true);
 +	PE_parse_boot_argn("emmcroot", want, sizeof(want));
 +
 +	se.regs = ml_io_map(reg[0], reg[1]);
@@ -727,8 +755,10 @@ new file mode 100644
 +
 +	lck_mtx_lock(&sweet_emmc_lock);
 +	error = e_bringup();
++	e_mark(2, error == 0);
 +	if (!error) {
 +		error = e_find_partition(want);
++		e_mark(3, error == 0);
 +	}
 +	lck_mtx_unlock(&sweet_emmc_lock);
 +	if (error) {
@@ -747,6 +777,7 @@ new file mode 100644
 +	devfs_make_node(se.bdev, DEVFS_BLOCK, UID_ROOT, GID_OPERATOR, 0640, "emmcroot0");
 +	devfs_make_node(makedev(se.cmajor, 0), DEVFS_CHAR, UID_ROOT, GID_OPERATOR, 0640, "remmcroot0");
 +	se.ready = true;
++	e_mark(4, true);
 +	printf("SWEET EMMC: \"%s\": first sector 0x%llx, %llu MiB, read-only, DMA at 0x%llx\n",
 +	    want, se.first_block, se.nblocks * EBLOCK >> 20, se.dma_pa);
 +	return 0;

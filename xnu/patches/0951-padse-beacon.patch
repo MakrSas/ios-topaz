@@ -1,0 +1,68 @@
+diff --git a/iokit/Kernel/arm/SweetBusy.cpp b/iokit/Kernel/arm/SweetBusy.cpp
+--- a/iokit/Kernel/arm/SweetBusy.cpp
++++ b/iokit/Kernel/arm/SweetBusy.cpp
+@@ -50,11 +50,64 @@
+ 	}
+ 	thread_terminate(current_thread());
+ }
+ 
++/*
++ * padse beacon: proof of life that does not depend on the console or on the display
++ * driver. A thread writes straight into the boot framebuffer that the MDP scans out
++ * (0x5c000000, 1200x1920, stride 4800): a square at the bottom right flips between two
++ * colours every second, and a bar along the bottom edge grows 8 px per second.
++ */
++#define BEACON_FB     0x5c000000UL
++#define BEACON_SIZE   0xf00000UL
++#define BEACON_W      1200u
++#define BEACON_H      1920u
++#define BEACON_STRIDE 1200u    /* 4800 bytes / 4 */
++
++extern "C" vm_offset_t ml_io_map(vm_offset_t, vm_size_t);
++
++static void
++sweet_beacon_fill(volatile uint32_t *fb, uint32_t x0, uint32_t y0, uint32_t w, uint32_t h, uint32_t color)
++{
++	for (uint32_t y = y0; y < y0 + h && y < BEACON_H; y++) {
++		for (uint32_t x = x0; x < x0 + w && x < BEACON_W; x++) {
++			fb[y * BEACON_STRIDE + x] = color;
++		}
++	}
++}
++
++static void
++sweet_beacon_thread(void *arg __unused, wait_result_t wr __unused)
++{
++	volatile uint32_t *fb = (volatile uint32_t *)ml_io_map(BEACON_FB, BEACON_SIZE);
++
++	if (fb == NULL) {
++		thread_terminate(current_thread());
++	}
++	for (uint32_t tick = 0;; tick++) {
++		uint32_t len = (tick * 8) % BEACON_W;
++
++		sweet_beacon_fill(fb, 1040, 1700, 120, 120, (tick & 1) ? 0xff00ff00 : 0xffff00ff);
++		sweet_beacon_fill(fb, 0, 1840, len, 20, 0xff00ffff);
++		sweet_beacon_fill(fb, len, 1840, BEACON_W - len, 20, 0xff000000);
++		IOSleep(1000);
++	}
++}
++
++static void
++sweet_beacon_start(void)
++{
++	thread_t thread;
++
++	if (kernel_thread_start(sweet_beacon_thread, NULL, &thread) == KERN_SUCCESS) {
++		thread_deallocate(thread);
++	}
++}
++
+ extern "C" void
+ sweet_busy_init(void)
+ {
+ 	thread_t thread;
++	sweet_beacon_start();
+ 	if (!PE_parse_boot_argn("sweetbusy", &sweet_busy_secs, sizeof(sweet_busy_secs)) || sweet_busy_secs == 0) {
+ 		return;
+ 	}
